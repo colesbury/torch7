@@ -102,6 +102,8 @@ void THSetArgErrorHandler( void (*torchArgErrorHandlerFunction_)(int argNumber, 
 static __thread void (*torchGCFunction)(void *data) = NULL;
 static __thread void *torchGCData;
 static long heapSize = 0;
+static __thread long heapDelta = 0;
+static const long heapMaxDelta = 1000000; // limit to +/- 1MB before updating heapSize
 static __thread long heapSoftmax = 300000000; // 300MB, adjusted upward dynamically
 static const double heapSoftmaxGrowthThresh = 0.8; // grow softmax if >80% max after GC
 static const double heapSoftmaxGrowthFactor = 1.4; // grow softmax by 40%
@@ -139,10 +141,14 @@ static long getAllocSize(void *ptr) {
  *     soft max by 40%
  */
 static void maybeTriggerGC(long curHeapSize) {
-  if(torchGCFunction && curHeapSize > heapSoftmax ) {
+  if (torchGCFunction && curHeapSize > heapSoftmax) {
     torchGCFunction(torchGCData);
-    long newHeapSize = THAtomicGetLong(&heapSize);
-    if(newHeapSize > heapSoftmax * heapSoftmaxGrowthThresh) {
+
+    // ensure heapSize is accurate before updating heapSoftmax
+    long newHeapSize = THAtomicAddLong(&heapSize, heapDelta) + heapDelta;
+    heapDelta = 0;
+
+    if (newHeapSize > heapSoftmax * heapSoftmaxGrowthThresh) {
       heapSoftmax = heapSoftmax * heapSoftmaxGrowthFactor;
     }
   }
@@ -150,7 +156,15 @@ static void maybeTriggerGC(long curHeapSize) {
 
 // hooks into the TH heap tracking
 void THHeapUpdate(long size) {
-  long newHeapSize = THAtomicAddLong(&heapSize, size) + size;
+  heapDelta += size;
+
+  // batch updates to global heapSize to minimize thread contention
+  if (heapDelta < heapMaxDelta && heapDelta > -heapMaxDelta) {
+    return;
+  }
+
+  long newHeapSize = THAtomicAddLong(&heapSize, heapDelta) + heapDelta;
+  heapDelta = 0;
 
 # ifdef TH_CHECK_HEAP_UPDATE
   if (newHeapSize < 0) {
@@ -216,7 +230,7 @@ void* THRealloc(void *ptr, long size)
 {
   if(!ptr)
     return(THAlloc(size));
-  
+
   if(size == 0)
   {
     THFree(ptr);
