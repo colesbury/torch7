@@ -783,7 +783,7 @@ THDescBuff THTensor_(desc)(const THTensor *tensor) {
   int i;
   for(i = 0; i < tensor->nDimension; i++) {
     if(n >= L) break;
-    n += snprintf(str+n, L-n, "%ld", tensor->size[i]);
+    n += snprintf(str+n, L-n, "%lld", tensor->size[i]);
     if(i < tensor->nDimension-1) {
       n += snprintf(str+n, L-n, "x");
     }
@@ -803,7 +803,7 @@ THDescBuff THTensor_(sizeDesc)(const THTensor *tensor) {
   int i;
   for(i = 0; i < tensor->nDimension; i++) {
     if(n >= L) break;
-    n += snprintf(str+n, L-n, "%ld", tensor->size[i]);
+    n += snprintf(str+n, L-n, "%lld", tensor->size[i]);
     if(i < tensor->nDimension-1) {
       n += snprintf(str+n, L-n, " x ");
     }

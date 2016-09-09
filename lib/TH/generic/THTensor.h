@@ -8,12 +8,12 @@
 
 typedef struct THTensor
 {
-    long *size;
-    long *stride;
+    int64_t *size;
+    int64_t *stride;
     int nDimension;
     
     THStorage *storage;
-    long storageOffset;
+    int64_t storageOffset;
     int refcount;
 
     char flag;
